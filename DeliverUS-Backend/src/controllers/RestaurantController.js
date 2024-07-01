@@ -1,4 +1,4 @@
-import { Restaurant, Product, RestaurantCategory, ProductCategory } from '../models/models.js'
+import { Restaurant, Product, RestaurantCategory, ProductCategory, sequelizeSession } from '../models/models.js'
 
 const index = async function (req, res) {
   try {
@@ -10,7 +10,8 @@ const index = async function (req, res) {
         model: RestaurantCategory,
         as: 'restaurantCategory'
       },
-        order: [[{ model: RestaurantCategory, as: 'restaurantCategory' }, 'name', 'ASC']]
+        // SOLUCION
+        order: [['status', 'ASC'], [{ model: RestaurantCategory, as: 'restaurantCategory' }, 'name', 'ASC']]
       }
     )
     res.json(restaurants)
@@ -28,7 +29,9 @@ const indexOwner = async function (req, res) {
         include: [{
           model: RestaurantCategory,
           as: 'restaurantCategory'
-        }]
+        }],
+        // SOLUCION
+        order: [['status', 'ASC'], [{ model: RestaurantCategory, as: 'restaurantCategory' }, 'name', 'DESC']]
       })
     res.json(restaurants)
   } catch (err) {
@@ -94,6 +97,40 @@ const destroy = async function (req, res) {
     res.status(500).send(err)
   }
 }
+// SOLUCION
+/*
+const OnlineOffline = async function (req, res) {
+  const t = await sequelizeSession.transaction()
+  try {
+    const RestaurantToUpdate = await Restaurant.findByPk(req.params.restaurantId)
+
+    const newStatus = RestaurantToUpdate.status === 'offline' ? 'online' : 'offline'
+    await Restaurant.update({ status: newStatus }, { where: { id: RestaurantToUpdate.id } }, { transaction: t })
+
+    await t.commit()
+    const updatedRestaurant = await Restaurant.findByPk(req.params.restaurantId)
+    res.json(updatedRestaurant)
+  } catch (err) {
+    await t.rollback()
+    res.status(500).send(err)
+  }
+} */
+
+const OnlineOffline = async function (req, res) {
+  const t = await sequelizeSession.transaction()
+  try {
+    const RestaurantToUpdate = await Restaurant.findByPk(req.params.restaurantId)
+    RestaurantToUpdate.status = RestaurantToUpdate.status === 'offline' ? 'online' : 'offline'
+    await RestaurantToUpdate.save({ transaction: t })
+
+    await t.commit()
+    const updatedRestaurant = await Restaurant.findByPk(req.params.restaurantId)
+    res.json(updatedRestaurant)
+  } catch (err) {
+    await t.rollback()
+    res.status(500).send(err)
+  }
+}
 
 const RestaurantController = {
   index,
@@ -101,6 +138,7 @@ const RestaurantController = {
   create,
   show,
   update,
-  destroy
+  destroy,
+  OnlineOffline
 }
 export default RestaurantController
